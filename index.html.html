@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>eu te amo nycotina</title>
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #0c0b10;
+    --verde: #4caf6a;
+    --vermelho: #e0244f;
+    --escuro: #a3163f;
+    --rosa: #ff8aa8;
+    --texto: #b4b0c2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0c0b10; }
+  }
+  :root[data-theme="dark"] { --bg: #0c0b10; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  #cena {
+    margin: 0; line-height: 1.05; letter-spacing: 0;
+    font-size: min(2.5vw, 1.7vh, 13px);
+    transition: opacity .6s;
+  }
+  .g { color: var(--verde); }
+  .r { color: var(--vermelho); }
+  .d { color: var(--escuro); }
+  .p { color: var(--rosa); }
+  p { color: var(--texto); font-size: 16px; margin: 16px 12px 0; text-align: center; }
+</style>
+</head>
+<body>
+<pre id="cena" aria-label="Animação de uma rosa desabrochando, vista levemente de cima"></pre>
+<p>vc é a flor mais linda q eu ja vi</p>
+<script>
+const W = 60, H = 40, BASE = { x: 30, y: 78 }, HEAD_Y = 24;
+const N = 5, NK = [3, 4, 5, 6, 7];
+const RAMP = " .:-=+*#%@";
+const DURACAO = 12;
+const cena = document.getElementById("cena");
+
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = t => t * t * (3 - 2 * t);
+
+function render(t) {
+  const ch = new Array(W * H).fill(" ");
+  const cl = new Array(W * H).fill("");
+  const put = (c, r, s, k) => {
+    if (c >= 0 && c < W && r >= 0 && r < H) { ch[r * W + c] = s; cl[r * W + c] = k; }
+  };
+  const line = (x0, y0, x1, y1, s, k) => {
+    const n = Math.ceil(Math.hypot(x1 - x0, (y1 - y0) / 2)) + 1;
+    for (let i = 0; i <= n; i++) {
+      const f = i / n;
+      put(Math.floor(x0 + (x1 - x0) * f), Math.floor((y0 + (y1 - y0) * f) / 2), s, k);
+    }
+  };
+
+  // progresso
+  const g = ease(clamp(t / 1.5));
+  const b = ease(clamp((t - 1.2) / 3));
+  const sway = Math.sin(t * 1.1) * 1.0;
+  const cy = BASE.y + (HEAD_Y - BASE.y) * g;
+  const frac = y => (BASE.y - y) / (BASE.y - HEAD_Y);
+  const xs = y => BASE.x + sway * frac(y) + 1.2 * Math.sin((BASE.y - y) / 9) * g;
+  const cx = xs(cy);
+
+  // caule
+  for (let row = 0; row < H; row++) {
+    const y = row * 2 + 1;
+    if (y < cy || y > BASE.y) continue;
+    const s = xs(y - 1) - xs(y + 1);
+    put(Math.floor(xs(y)), row, s > 0.6 ? "/" : s < -0.6 ? "\\" : "|", "g");
+  }
+
+  // espinhos
+  if (g > 0.7) {
+    put(Math.floor(xs(54)) + 1, 27, ">", "g");
+    put(Math.floor(xs(62)) - 1, 31, "<", "g");
+    put(Math.floor(xs(70)) + 1, 35, ">", "g");
+  }
+
+  // folhas serrilhadas
+  const lf = clamp((g - 0.55) / 0.4);
+  if (lf > 0.05) {
+    const folhas = [{ ly: 57, lado: 1 }, { ly: 67, lado: -1 }];
+    for (let row = 0; row < H; row++) {
+      for (let col = 0; col < W; col++) {
+        const px = col + 0.5, y = row * 2 + 1;
+        for (const f of folhas) {
+          const a = -f.lado * 0.5;
+          const lx = xs(f.ly) + f.lado * 7 * lf;
+          const dx = px - lx, dy = y - f.ly;
+          const u = dx * Math.cos(a) + dy * Math.sin(a);
+          const v = -dx * Math.sin(a) + dy * Math.cos(a);
+          const rx = 8.5 * lf, ry = 3.4 * lf;
+          const e = (u * u) / (rx * rx) + (v * v) / (ry * ry);
+          if (e < 1) {
+            put(col, row, Math.abs(v) < 0.6 ? "-" : e > 0.7 ? ((col + row) % 2 ? "^" : "*") : "%", "g");
+          }
+        }
+      }
+    }
+  }
+
+  // flor
+  if (g > 0.85) {
+    const R = 5 + 10 * b;
+    const tilt = 0.72 + 1.0 * Math.pow(1 - b, 1.5);   // vista de cima: achatada; botão: alongado
+    const amp = 0.03 + 0.09 * b;
+    const ob = [];
+    for (let k = 0; k < N; k++) ob.push(ease(clamp(b * 1.8 - (N - 1 - k) * 0.2)));
+
+    const dCup = 0.3 * R * clamp(b * 1.5);
+    const Rc = R * 0.9 * (0.7 + 0.3 * ob[N - 1]);
+    const cupY = cy + dCup;
+
+    // sépalas verdes sob o cálice
+    const sp = clamp((b - 0.3) / 0.5);
+    if (sp > 0) {
+      const base = cupY + Rc * tilt;
+      line(cx - 3, base - 3, cx - 3 - 7 * sp, base - 3 + 7 * sp, "/", "g");
+      line(cx + 3, base - 3, cx + 3 + 7 * sp, base - 3 + 7 * sp, "\\", "g");
+      line(cx - 1, base - 2, cx - 1 - 3 * sp, base - 2 + 9 * sp, "/", "g");
+      line(cx + 1, base - 2, cx + 1 + 3 * sp, base - 2 + 9 * sp, "\\", "g");
+    }
+
+    for (let row = 0; row < H; row++) {
+      for (let col = 0; col < W; col++) {
+        const px = col + 0.5, y = row * 2 + 1;
+
+        // pétalas externas, vistas de frente (cálice)
+        {
+          const dx = px - cx, dyc = (y - cupY) / tilt;
+          const rc = Math.hypot(dx, dyc), thc = Math.atan2(dyc, dx);
+          const edge = Rc * (1 + 0.07 * Math.cos(5 * thc + 0.5));
+          if (rc < edge) {
+            if (Math.sin(9 * thc) > 0.8) { put(col, row, "|", "d"); }
+            else {
+              const val = clamp(0.35 + 0.35 * (rc / edge) + 0.3 * (y - cy) / (R * 1.4));
+              put(col, row, RAMP[Math.floor(val * (RAMP.length - 1))], "r");
+            }
+          }
+        }
+
+        // topo da flor: camadas de pétalas em espiral
+        {
+          const dx = px - cx, dyN = (y - cy) / tilt;
+          const r = Math.hypot(dx, dyN), th = Math.atan2(dyN, dx);
+          let layer = -1, rsel = 0;
+          for (let k = N - 1; k >= 0; k--) {
+            const rk = R * (k + 1) / N * (0.7 + 0.3 * ob[k]) * (1 + amp * Math.cos(NK[k] * th + k * 1.3));
+            if (r < rk) { layer = k; rsel = rk; }
+          }
+          if (layer >= 0) {
+            const ur = r / rsel;
+            const inner = layer / (layer + 1);
+            const tt = clamp((ur - inner) / (1 - inner));
+            if (layer === 0 && ur < 0.6) {
+              const v = 0.5 + 0.5 * Math.sin(3 * th + 9 * ur);
+              put(col, row, v > 0.6 ? ";" : ":", "d");
+            } else if (tt > 0.86) {
+              const c = Math.abs(dyN) > Math.abs(dx) * 1.2 ? "-" : dx > 0 ? ")" : "(";
+              put(col, row, c, "p");
+            } else {
+              const val = 0.25 + 0.6 * tt;
+              put(col, row, RAMP[Math.floor(val * (RAMP.length - 1))], tt < 0.35 ? "d" : "r");
+            }
+          }
+        }
+      }
+    }
+
+    // pétalas caindo
+    if (t > 5.5) {
+      for (let i = 0; i < 3; i++) {
+        const age = t - (5.5 + i * 1.6);
+        if (age <= 0) continue;
+        const px = cx + (i - 1) * 7 + 5 * Math.sin(age * 2 + i);
+        const py = HEAD_Y + R * 0.9 + age * 7;
+        if (py > 76) continue;
+        put(Math.floor(px), Math.floor(py / 2), "(", "p");
+        put(Math.floor(px) + 1, Math.floor(py / 2), ")", "p");
+      }
+    }
+  }
+
+  // monta o HTML juntando trechos da mesma cor
+  let html = "";
+  for (let row = 0; row < H; row++) {
+    let classe = "", buf = "";
+    for (let col = 0; col < W; col++) {
+      const k = cl[row * W + col];
+      if (k !== classe) {
+        if (buf) html += classe ? `<span class="${classe}">${buf}</span>` : buf;
+        buf = ""; classe = k;
+      }
+      buf += ch[row * W + col];
+    }
+    if (buf) html += classe ? `<span class="${classe}">${buf}</span>` : buf;
+    html += "\n";
+  }
+  cena.innerHTML = html;
+}
+
+let inicio = performance.now(), ultimo = 0;
+function loop(agora) {
+  requestAnimationFrame(loop);
+  if (agora - ultimo < 33) return;
+  ultimo = agora;
+  const t = ((agora - inicio) / 1000) % DURACAO;
+  cena.style.opacity = t < 0.4 ? t / 0.4 : t > DURACAO - 0.8 ? (DURACAO - t) / 0.8 : 1;
+  render(t);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
